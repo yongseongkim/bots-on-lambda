@@ -1,5 +1,6 @@
-import puppeteer from "puppeteer-core";
 import fs from "fs/promises";
+import path from "path";
+import puppeteer from "puppeteer-core";
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -136,11 +137,6 @@ function* gridIterator(sw, ne, stepLat, stepLng) {
   for (let lat = sw.lat; lat < ne.lat; lat += stepLat) {
     for (let lng = sw.lng; lng < ne.lng; lng += stepLng) {
       yield {
-        sw: { lat, lng },
-        ne: {
-          lat: Math.min(lat + stepLat, ne.lat),
-          lng: Math.min(lng + stepLng, ne.lng),
-        },
         center: {
           lat: lat + stepLat / 2,
           lng: lng + stepLng / 2,
@@ -154,7 +150,8 @@ export const handler = async () => {
   const browser = await puppeteer.launch({
     executablePath: "/opt/homebrew/bin/chromium",
     headless: false,
-    defaultViewport: { width: 1200, height: 900 },
+    defaultViewport: { width: 2400, height: 1200 },
+    args: ["--window-size=2400,1200"],
   });
 
   const page = await browser.newPage();
@@ -188,8 +185,8 @@ export const handler = async () => {
   await page.click('[data-ga-event="intro,closeBtn"]'); // 설치 유도 팝업 닫기
 
   // // grid 간격 (구마다 너무 촘촘하면 느려질 수 있으니 0.02~0.05 정도 추천)
-  const gridStepLat = 0.03;
-  const gridStepLng = 0.03;
+  const gridStepLat = 0.01;
+  const gridStepLng = 0.01;
 
   for (const district of seoulDistricts) {
     console.log(`=== ${district.name} ===`);
@@ -199,9 +196,7 @@ export const handler = async () => {
       gridStepLat,
       gridStepLng
     )) {
-      console.log(
-        `지도 중심 (${cell.sw.lat}, ${cell.sw.lng}) - (${cell.ne.lat}, ${cell.ne.lng})`
-      );
+      console.log(`지도 중심 (${cell.center.lat}, ${cell.center.lng})`);
       // 지도 중심 좌표를 cell.center로 이동
       await page.evaluate((center) => {
         localStorage.setItem("MAP_ZOOM", "16");
@@ -221,8 +216,12 @@ export const handler = async () => {
     const unique = Array.from(
       new Map(arr.map((item) => [item.id, item])).values()
     );
+
+    const outputDir = "./data/apt";
+    await fs.mkdir(outputDir, { recursive: true }); // 출력 폴더 생성
+
     await fs.writeFile(
-      `./${district.name}.json`,
+      path.join(outputDir, `${district.name}.json`),
       JSON.stringify(unique, null, 2),
       "utf-8"
     );
