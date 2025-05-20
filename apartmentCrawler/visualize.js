@@ -19,8 +19,10 @@ export const handler = async () => {
     let polygons = [];
     data
       .filter((item) => item?.type === 0) // type 0: 아파트
-      .filter((item) => (item?.building_count ?? 0) > 3) // 건물 수 3개 이상
-      .filter((item) => (item?.total_household ?? 0) > 100) // 세대 수 100개 이상
+      .filter(
+        (item) =>
+          (item?.building_count ?? 0) > 5 && (item?.total_household ?? 0) >= 500
+      ) // 건물 수 3개 이상 && 세대 수 500개 이상
       .forEach((item) => {
         const groupPolygons = item?.polygon?.groupPolygons;
         if (Array.isArray(groupPolygons)) {
