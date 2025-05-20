@@ -12,43 +12,43 @@ const seoulDistricts = [
   },
   {
     name: "강동구",
-    sw: { lat: 37.5302, lng: 127.1146 },
-    ne: { lat: 37.5735, lng: 127.1576 },
+    sw: { lat: 37.517648, lng: 127.112757 },
+    ne: { lat: 37.5813619, lng: 127.1847987 },
   },
   {
     name: "강북구",
-    sw: { lat: 37.612, lng: 127.0089 },
-    ne: { lat: 37.6476, lng: 127.0367 },
+    sw: { lat: 37.5787976, lng: 126.9111852 },
+    ne: { lat: 37.5787976, lng: 126.9111852 },
   },
   {
     name: "강서구",
-    sw: { lat: 37.5311, lng: 126.7654 },
-    ne: { lat: 37.6017, lng: 126.8657 },
+    sw: { lat: 37.5214073, lng: 126.7674894 },
+    ne: { lat: 37.5787976, lng: 126.9111852 },
   },
   {
     name: "관악구",
-    sw: { lat: 37.4292, lng: 126.9007 },
-    ne: { lat: 37.4871, lng: 126.9713 },
+    sw: { lat: 37.5787976, lng: 126.9111852 },
+    ne: { lat: 37.501438, lng: 126.987442 },
   },
   {
     name: "광진구",
-    sw: { lat: 37.5369, lng: 127.0671 },
-    ne: { lat: 37.5663, lng: 127.1162 },
+    sw: { lat: 37.5238168, lng: 127.0542475 },
+    ne: { lat: 37.5682856, lng: 127.120103 },
   },
   {
     name: "구로구",
-    sw: { lat: 37.4755, lng: 126.8346 },
-    ne: { lat: 37.5077, lng: 126.9022 },
+    sw: { lat: 37.4851398, lng: 126.8116223 },
+    ne: { lat: 37.4851398, lng: 126.8116223 },
   },
   {
     name: "금천구",
-    sw: { lat: 37.4459, lng: 126.8852 },
-    ne: { lat: 37.4924, lng: 126.9543 },
+    sw: { lat: 37.4380277, lng: 126.8668112 },
+    ne: { lat: 37.4874886, lng: 126.9152197 },
   },
   {
     name: "노원구",
-    sw: { lat: 37.62, lng: 127.0527 },
-    ne: { lat: 37.6822, lng: 127.1145 },
+    sw: { lat: 37.6068501, lng: 127.0481714 },
+    ne: { lat: 37.6964155, lng: 127.1108278 },
   },
   {
     name: "도봉구",
@@ -57,8 +57,8 @@ const seoulDistricts = [
   },
   {
     name: "동대문구",
-    sw: { lat: 37.5744, lng: 127.0256 },
-    ne: { lat: 37.6063, lng: 127.0727 },
+    sw: { lat: 37.5591012, lng: 127.0141825 },
+    ne: { lat: 37.6063061, lng: 127.0794138 },
   },
   {
     name: "동작구",
@@ -72,22 +72,22 @@ const seoulDistricts = [
   },
   {
     name: "서대문구",
-    sw: { lat: 37.5635, lng: 126.9241 },
-    ne: { lat: 37.6067, lng: 126.9732 },
+    sw: { lat: 37.5548146, lng: 126.8948778 },
+    ne: { lat: 37.6143973, lng: 126.9666323 },
   },
   {
     name: "서초구",
-    sw: { lat: 37.4436, lng: 127.0052 },
-    ne: { lat: 37.5124, lng: 127.0665 },
+    sw: { lat: 37.4453876, lng: 126.9827684 },
+    ne: { lat: 37.5325609, lng: 37.5325609 },
   },
   {
     name: "성동구",
-    sw: { lat: 37.5407, lng: 127.0216 },
-    ne: { lat: 37.5663, lng: 127.0562 },
+    sw: { lat: 37.5309273, lng: 127.0095476 },
+    ne: { lat: 37.5717556, lng: 127.0861086 },
   },
   {
     name: "성북구",
-    sw: { lat: 37.582, lng: 127.0116 },
+    sw: { lat: 37.584952, lng: 126.9755586 },
     ne: { lat: 37.6146, lng: 127.0507 },
   },
   {
@@ -97,18 +97,18 @@ const seoulDistricts = [
   },
   {
     name: "양천구",
-    sw: { lat: 37.5124, lng: 126.8235 },
-    ne: { lat: 37.5611, lng: 126.8707 },
+    sw: { lat: 37.501721, lng: 126.8100771 },
+    ne: { lat: 37.5486904, lng: 126.885951 },
   },
   {
     name: "영등포구",
-    sw: { lat: 37.4981, lng: 126.8828 },
-    ne: { lat: 37.5437, lng: 126.9411 },
+    sw: { lat: 37.4784982, lng: 126.8783125 },
+    ne: { lat: 37.5467169, lng: 126.9444021 },
   },
   {
     name: "용산구",
-    sw: { lat: 37.5172, lng: 126.9568 },
-    ne: { lat: 37.5454, lng: 127.0122 },
+    sw: { lat: 37.5139089, lng: 126.940883 },
+    ne: { lat: 37.5593734, lng: 127.0146974 },
   },
   {
     name: "은평구",
@@ -117,13 +117,13 @@ const seoulDistricts = [
   },
   {
     name: "종로구",
-    sw: { lat: 37.5704, lng: 126.9516 },
-    ne: { lat: 37.6063, lng: 127.0176 },
+    sw: { lat: 37.5649525, lng: 126.952041 },
+    ne: { lat: 37.6264305, lng: 127.0272287 },
   },
   {
     name: "중구",
-    sw: { lat: 37.5509, lng: 126.9658 },
-    ne: { lat: 37.5663, lng: 127.0196 },
+    sw: { lat: 37.5519567, lng: 126.9614824 },
+    ne: { lat: 37.5762454, lng: 127.0264562 },
   },
   {
     name: "중랑구",
@@ -150,8 +150,8 @@ export const handler = async () => {
   const browser = await puppeteer.launch({
     executablePath: "/opt/homebrew/bin/chromium",
     headless: false,
-    defaultViewport: { width: 2400, height: 1200 },
-    args: ["--window-size=2400,1200"],
+    defaultViewport: { width: 2400, height: 1800 },
+    args: ["--window-size=2400,1800"],
   });
 
   const page = await browser.newPage();
@@ -185,8 +185,8 @@ export const handler = async () => {
   await page.click('[data-ga-event="intro,closeBtn"]'); // 설치 유도 팝업 닫기
 
   // // grid 간격 (구마다 너무 촘촘하면 느려질 수 있으니 0.02~0.05 정도 추천)
-  const gridStepLat = 0.01;
-  const gridStepLng = 0.01;
+  const gridStepLat = 0.015;
+  const gridStepLng = 0.015;
 
   for (const district of seoulDistricts) {
     console.log(`=== ${district.name} ===`);
