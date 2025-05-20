@@ -1,6 +1,5 @@
 import axios from "axios";
 import fs from "fs/promises";
-import { type } from "os";
 import path from "path";
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));

@@ -17,16 +17,20 @@ export const handler = async () => {
 
     // groupPolygons를 flat하게 추출
     let polygons = [];
-    data.forEach((item) => {
-      const groupPolygons = item?.polygon?.groupPolygons;
-      if (Array.isArray(groupPolygons)) {
-        groupPolygons.forEach((polygonGroup) => {
-          polygonGroup.forEach((ring) => {
-            polygons.push(ring[0]); // ring: [{x, y}, ...]
+    data
+      .filter((item) => item?.type === 0) // type 0: 아파트
+      .filter((item) => (item?.building_count ?? 0) > 3) // 건물 수 3개 이상
+      .filter((item) => (item?.total_household ?? 0) > 100) // 세대 수 100개 이상
+      .forEach((item) => {
+        const groupPolygons = item?.polygon?.groupPolygons;
+        if (Array.isArray(groupPolygons)) {
+          groupPolygons.forEach((polygonGroup) => {
+            polygonGroup.forEach((ring) => {
+              polygons.push(ring[0]); // ring: [{x, y}, ...]
+            });
           });
-        });
-      }
-    });
+        }
+      });
 
     // 중심좌표 계산 (첫 번째 ring의 첫 번째 좌표 사용, 없으면 서울시청)
     let center = { lat: 37.5665, lng: 126.978 };

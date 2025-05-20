@@ -7,8 +7,8 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const seoulDistricts = [
   {
     name: "강남구",
-    sw: { lat: 37.4563, lng: 127.0377 },
-    ne: { lat: 37.5172, lng: 127.1127 },
+    sw: { lat: 37.464246, lng: 126.989113 },
+    ne: { lat: 37.549363, lng: 127.0818126 },
   },
   {
     name: "강동구",
