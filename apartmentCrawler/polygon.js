@@ -67,12 +67,12 @@ export const handler = async () => {
 
     // 구별로 파일 저장 (data/apt_polygon 폴더에 저장)
     await fs.writeFile(
-      path.join(outputDir, `${guName}_polygons.json`),
+      path.join(outputDir, `${guName}.json`),
       JSON.stringify(guResults, null, 2),
       "utf-8"
     );
     console.log(
-      `[${guName}] Saved ${guResults.length} polygons to ${outputDir}/${guName}_polygons.json`
+      `[${guName}] Saved ${guResults.length} polygons to ${outputDir}/${guName}.json`
     );
   }
 };
