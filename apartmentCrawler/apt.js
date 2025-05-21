@@ -17,8 +17,8 @@ const seoulDistricts = [
   },
   {
     name: "강북구",
-    sw: { lat: 37.5787976, lng: 126.9111852 },
-    ne: { lat: 37.5787976, lng: 126.9111852 },
+    sw: { lat: 37.6109298, lng: 126.9970592 },
+    ne: { lat: 37.6684294, lng: 127.0477852 },
   },
   {
     name: "강서구",
@@ -27,8 +27,8 @@ const seoulDistricts = [
   },
   {
     name: "관악구",
-    sw: { lat: 37.5787976, lng: 126.9111852 },
-    ne: { lat: 37.501438, lng: 126.987442 },
+    sw: { lat: 37.4389137, lng: 126.8967017 },
+    ne: { lat: 37.5015851, lng: 126.9875106 },
   },
   {
     name: "광진구",
@@ -37,8 +37,8 @@ const seoulDistricts = [
   },
   {
     name: "구로구",
-    sw: { lat: 37.4851398, lng: 126.8116223 },
-    ne: { lat: 37.4851398, lng: 126.8116223 },
+    sw: { lat: 37.468621, lng: 126.8136176 },
+    ne: { lat: 37.517381, lng: 126.9085463 },
   },
   {
     name: "금천구",
@@ -146,18 +146,17 @@ function* gridIterator(sw, ne, stepLat, stepLng) {
   }
 }
 
-export const handler = async () => {
+// 각 구별 크롤링 함수 (브라우저 인스턴스 분리)
+async function crawlDistrict(district) {
   const browser = await puppeteer.launch({
     executablePath: "/opt/homebrew/bin/chromium",
     headless: false,
-    defaultViewport: { width: 2400, height: 1800 },
-    args: ["--window-size=2400,1800"],
+    defaultViewport: { width: 1200, height: 800 },
+    args: ["--window-size=1200,800"],
   });
 
   const page = await browser.newPage();
-  // 구별 데이터 누적용 객체
-  const districtResults = {};
-  for (const d of seoulDistricts) districtResults[d.name] = [];
+  const districtResults = [];
 
   // bounding API 응답 가로채기
   page.on("response", async (response) => {
@@ -166,13 +165,11 @@ export const handler = async () => {
       try {
         const json = await response.json();
         if (json.status === "success" && Array.isArray(json.data)) {
-          for (const district of seoulDistricts) {
-            const filtered = json.data.filter(
-              (item) => item.address && item.address.includes(district.name)
-            );
-            if (filtered.length > 0) {
-              districtResults[district.name].push(...filtered);
-            }
+          const filtered = json.data.filter(
+            (item) => item.address && item.address.includes(district.name)
+          );
+          if (filtered.length > 0) {
+            districtResults.push(...filtered);
           }
         }
       } catch (e) {
@@ -182,51 +179,72 @@ export const handler = async () => {
   });
 
   await page.goto("https://hogangnono.com/", { waitUntil: "networkidle2" });
-  await page.click('[data-ga-event="intro,closeBtn"]'); // 설치 유도 팝업 닫기
-
-  // // grid 간격 (구마다 너무 촘촘하면 느려질 수 있으니 0.02~0.05 정도 추천)
-  const gridStepLat = 0.015;
-  const gridStepLng = 0.015;
-
-  for (const district of seoulDistricts) {
-    console.log(`=== ${district.name} ===`);
-    for (const cell of gridIterator(
-      district.sw,
-      district.ne,
-      gridStepLat,
-      gridStepLng
-    )) {
-      console.log(`지도 중심 (${cell.center.lat}, ${cell.center.lng})`);
-      // 지도 중심 좌표를 cell.center로 이동
-      await page.evaluate((center) => {
-        localStorage.setItem("MAP_ZOOM", "16");
-        localStorage.setItem(
-          "MAP_CENTER",
-          `{"lat": ${center.lat}, "lng": ${center.lng}}`
-        );
-      }, cell.center);
-      await page.reload();
-
-      const randomMs = 1500 + Math.random() * 1500;
-      await sleep(randomMs);
-    }
-
-    // ★ 중간 저장: id 기준 중복 제거 후 파일로 저장
-    const arr = districtResults[district.name];
-    const unique = Array.from(
-      new Map(arr.map((item) => [item.id, item])).values()
-    );
-
-    const outputDir = "./data/apt";
-    await fs.mkdir(outputDir, { recursive: true }); // 출력 폴더 생성
-
-    await fs.writeFile(
-      path.join(outputDir, `${district.name}.json`),
-      JSON.stringify(unique, null, 2),
-      "utf-8"
-    );
-    console.log(`[중간저장] ${district.name} (${unique.length}건)`);
+  try {
+    await page.click('[data-ga-event="intro,closeBtn"]');
+  } catch (e) {
+    // 팝업 없을 수도 있음
   }
 
-  // await browser.close();
+  const gridStepLat = 0.011;
+  const gridStepLng = 0.011;
+
+  for (const cell of gridIterator(
+    district.sw,
+    district.ne,
+    gridStepLat,
+    gridStepLng
+  )) {
+    console.log(`[${district.name}] 지도 중심 (${cell.center.lat}, ${cell.center.lng})`);
+    await page.evaluate((center) => {
+      localStorage.setItem("MAP_ZOOM", "16");
+      localStorage.setItem(
+        "MAP_CENTER",
+        `{"lat": ${center.lat}, "lng": ${center.lng}}`
+      );
+    }, cell.center);
+    await page.reload();
+
+    const randomMs = 1500 + Math.random() * 1500;
+    await sleep(randomMs);
+  }
+
+  // id 기준 중복 제거 후 파일로 저장
+  const arr = districtResults;
+  const unique = Array.from(
+    new Map(arr.map((item) => [item.id, item])).values()
+  );
+
+  const outputDir = "./data/apt";
+  await fs.mkdir(outputDir, { recursive: true });
+
+  await fs.writeFile(
+    path.join(outputDir, `${district.name}.json`),
+    JSON.stringify(unique, null, 2),
+    "utf-8"
+  );
+  console.log(`[저장] ${district.name} (${unique.length}건)`);
+
+  await browser.close();
+}
+
+// 병렬 실행 제한 유틸
+async function parallelLimit(arr, limit, asyncFn) {
+  const ret = [];
+  let idx = 0;
+  async function next() {
+    if (idx >= arr.length) return;
+    const cur = idx++;
+    await asyncFn(arr[cur]);
+    await next();
+  }
+  const tasks = [];
+  for (let i = 0; i < limit; i++) {
+    tasks.push(next());
+  }
+  await Promise.all(tasks);
+}
+
+export const handler = async () => {
+  // 동시에 3개 브라우저만 실행 (메모리/CPU 상황에 따라 조절)
+  await parallelLimit(seoulDistricts, 3, crawlDistrict);
 };
