@@ -21,7 +21,8 @@ export const handler = async () => {
       .filter((item) => item?.type === 0) // type 0: 아파트
       .filter(
         (item) =>
-          (item?.building_count ?? 0) > 5 && (item?.total_household ?? 0) >= 500
+          (item?.building_count ?? 0) >= 3 &&
+          (item?.total_household ?? 0) >= 300
       ) // 건물 수 3개 이상 && 세대 수 500개 이상
       .forEach((item) => {
         const groupPolygons = item?.polygon?.groupPolygons;
@@ -85,10 +86,6 @@ export const handler = async () => {
 `;
 
     const guName = path.basename(file, ".json");
-    await fs.writeFile(
-      path.join(outputDir, `${guName}_polygon_map.html`),
-      html,
-      "utf-8"
-    );
+    await fs.writeFile(path.join(outputDir, `${guName}.html`), html, "utf-8");
   }
 };
