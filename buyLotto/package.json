@@ -1,0 +1,14 @@
+{
+  "name": "buy-lotto",
+  "version": "1.0.0",
+  "description": "Automated lotto ticket purchase bot for dhlottery.co.kr",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "local": "node -e \"require('./index.js').handler().then(console.log).catch(console.error)\""
+  },
+  "dependencies": {
+    "aws-lambda-ric": "^4.0.1",
+    "playwright": "^1.40.0"
+  }
+}
