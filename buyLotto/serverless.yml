@@ -1,0 +1,22 @@
+service: buy-lotto
+
+provider:
+  name: aws
+  region: ap-northeast-2
+  ecr:
+    images:
+      buy-lotto:
+        path: ./
+
+functions:
+  buyLotto:
+    image:
+      name: buy-lotto
+    memorySize: 2048
+    timeout: 120
+    events:
+      # Friday 20:00 KST = Friday 11:00 UTC
+      - schedule:
+          rate: cron(0 11 ? * FRI *)
+          enabled: true
+          description: "Buy lotto tickets every Friday at 20:00 KST"

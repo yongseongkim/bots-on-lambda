@@ -1,12 +1,42 @@
-const { chromium: playwright } = require("playwright-core");
-const chromium = require("@sparticuz/chromium");
+const { chromium } = require("playwright");
+const https = require("https");
 
-const ID = "";
-const PW = "";
+const ID = process.env.LOTTO_ID;
+const PW = process.env.LOTTO_PW;
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
+
+const NUMBER_OF_TICKETS = 5;
 
 function delay(milliseconds) {
   return new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
+  });
+}
+
+async function sendSlackNotification(message) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(SLACK_WEBHOOK_URL);
+    const data = JSON.stringify({ text: message });
+
+    const options = {
+      hostname: url.hostname,
+      path: url.pathname,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(data),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let body = "";
+      res.on("data", (chunk) => (body += chunk));
+      res.on("end", () => resolve(body));
+    });
+
+    req.on("error", reject);
+    req.write(data);
+    req.end();
   });
 }
 
@@ -18,74 +48,99 @@ async function buy(browser, numberOfPurchase) {
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     isMobile: false,
   });
-  // 동행복권 사이트에서 navigator.platform 으로 모바일 페이지로 리다이렉트 되는 문제 해결
+
   await page.addInitScript(() => {
     Object.defineProperty(Object.getPrototypeOf(navigator), "platform", {
       value: "macintel",
     });
   });
 
-  // 로그인
-  await page.goto("https://dhlottery.co.kr/user.do?method=login");
-  await page.getByPlaceholder("아이디").fill(ID);
-  await page.getByPlaceholder("비밀번호").fill(PW);
-  await page.locator("form[name='jform'] >> text=로그인").click();
+  await page.goto("https://www.dhlottery.co.kr/login");
+  await page.locator("#inpUserId").fill(ID);
+  await page.locator("#inpUserPswdEncn").fill(PW);
+  await page.locator("#btnLogin").click();
   console.log("로그인 완료", page.url());
 
-  await page.goto("https://el.dhlottery.co.kr/game/TotalGame.jsp?LottoId=LO40");
-  const frame = await page.frameLocator("#ifrm_tab");
-  // 번호 옵션(혼합, 자동, 직전회차) 선택
-  const options = await frame.locator("#tabWay2Buy >> li").all();
-  for (const option of options) {
-    const contents = await option.allInnerTexts();
-    if (contents.some((c) => c.includes("자동번호발급"))) {
-      await option.click();
-      console.log("자동번호 발급 선택 완료");
-      break;
-    }
-  }
-  await frame.locator("#amoundApply").selectOption(`${numberOfPurchase}`);
-  await frame.locator("#btnSelectNum").click();
+  // Navigate directly to the game page (no iframe needed)
+  await page.goto("https://ol.dhlottery.co.kr/olotto/game/game645.do");
+  await page.waitForLoadState("networkidle");
+
+  // No iframe - interact directly with the page
+  await page.locator("#num2").waitFor({ state: "visible" });
+  await page.evaluate(() => selectWayTab(1));
+  console.log("자동번호 발급 선택 완료");
+
+  await page.locator("#amoundApply").selectOption(`${numberOfPurchase}`);
+  await page.locator("#btnSelectNum").click();
   console.log("수량 선택 완료");
 
-  await frame.locator("#btnBuy").click();
-
-  await frame.locator("#popupLayerConfirm >> text=확인").click();
+  await page.locator("#btnBuy").click();
+  await page.locator('input[onclick*="closepopupLayerConfirm(true)"]').click();
   console.log("구매 확인");
   await delay(2500);
 
   console.log("구매 완료");
-  console.log(await frame.locator("#buyRound").allInnerTexts());
+  const roundText = await page.locator("#buyRound").allInnerTexts();
+  console.log(roundText);
 
-  // 결과 출력
-  const result = await frame.locator("#reportRow >> li").all();
-  if (result.length === 0) {
+  const resultArea = await page.locator("#selectRow").innerText();
+  const purchaseResults = [];
+
+  if (!resultArea || resultArea.trim().length === 0) {
     console.log("구매 기록이 없습니다.");
+    purchaseResults.push("구매 기록이 없습니다.");
   } else {
-    const messages = Promise.all(
-      result.map(async (e) => {
-        const contents = await e.allInnerTexts();
-        contents.map((c) => (c == "\n" ? " " : c));
-        return contents;
-      })
-    );
-    for (const m of await messages) {
-      console.log(m);
-    }
+    const cleaned = resultArea.replace(/\n/g, " ").trim();
+    console.log(cleaned);
+    purchaseResults.push(cleaned);
   }
+
   await context.close();
+
+  return {
+    round: roundText.join(""),
+    tickets: purchaseResults,
+  };
 }
 
 exports.handler = async (event, context) => {
   let browser = null;
+  let purchaseResult = null;
+
   try {
-    browser = await playwright.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: false,
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
-    await buy(browser, 1);
+
+    purchaseResult = await buy(browser, NUMBER_OF_TICKETS);
+
+    const slackMessage = [
+      `*로또 자동 구매 완료* :four_leaf_clover:`,
+      `회차: ${purchaseResult.round}`,
+      `구매 수량: ${NUMBER_OF_TICKETS}장`,
+      ``,
+      `*구매 번호:*`,
+      ...purchaseResult.tickets.map((t) => `- ${t}`),
+    ].join("\n");
+
+    await sendSlackNotification(slackMessage);
+    console.log("Slack 알림 전송 완료");
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        message: "Lotto purchase completed",
+        result: purchaseResult,
+      }),
+    };
   } catch (error) {
+    console.error("Error:", error);
+
+    await sendSlackNotification(
+      `*로또 구매 실패* :x:\n에러: ${error.message}`
+    );
+
     throw error;
   } finally {
     if (browser) {
