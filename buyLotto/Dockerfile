@@ -1,6 +1,11 @@
-FROM mcr.microsoft.com/playwright:v1.40.0-jammy
+FROM mcr.microsoft.com/playwright:v1.57.0-jammy
 
-# Install AWS Lambda Runtime Interface Client
+# Install build tools and upgrade Node.js to 22
+RUN apt-get update && apt-get install -y cmake curl xz-utils build-essential && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -12,5 +17,5 @@ COPY . .
 ADD https://github.com/aws/aws-lambda-runtime-interface-emulator/releases/latest/download/aws-lambda-rie /usr/local/bin/aws-lambda-rie
 RUN chmod +x /usr/local/bin/aws-lambda-rie
 
-ENTRYPOINT ["/usr/local/bin/npx", "aws-lambda-ric"]
-CMD ["index.handler"]
+ENTRYPOINT ["/usr/bin/npx", "aws-lambda-ric"]
+CMD ["/app/index.handler"]
