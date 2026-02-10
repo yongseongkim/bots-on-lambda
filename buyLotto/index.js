@@ -7,12 +7,6 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
 
 const NUMBER_OF_TICKETS = 5;
 
-function delay(milliseconds) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
-}
-
 async function sendSlackNotification(message) {
   return new Promise((resolve, reject) => {
     const url = new URL(SLACK_WEBHOOK_URL);
@@ -77,22 +71,28 @@ async function buy(browser, numberOfPurchase) {
   await page.locator("#btnBuy").click();
   await page.locator('input[onclick*="closepopupLayerConfirm(true)"]').click();
   console.log("구매 확인");
-  await delay(2500);
 
+  // Wait for receipt popup to appear
+  await page.locator("#popReceipt").waitFor({ state: "visible" });
   console.log("구매 완료");
+
   const roundText = await page.locator("#buyRound").allInnerTexts();
   console.log(roundText);
 
-  const resultArea = await page.locator("#selectRow").innerText();
-  const purchaseResults = [];
+  // Extract actual numbers from receipt popup
+  const purchaseResults = await page.$$eval("#reportRow > li", (rows) => {
+    return rows.map((row) => {
+      const label = row.querySelector("strong > span:first-child").textContent.trim();
+      const nums = [...row.querySelectorAll(".nums > span")].map((s) => s.textContent.trim());
+      return `${label}: ${nums.join(", ")}`;
+    });
+  });
 
-  if (!resultArea || resultArea.trim().length === 0) {
+  if (purchaseResults.length === 0) {
     console.log("구매 기록이 없습니다.");
     purchaseResults.push("구매 기록이 없습니다.");
   } else {
-    const cleaned = resultArea.replace(/\n/g, " ").trim();
-    console.log(cleaned);
-    purchaseResults.push(cleaned);
+    console.log(purchaseResults);
   }
 
   await context.close();
