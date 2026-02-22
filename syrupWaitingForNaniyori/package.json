@@ -1,0 +1,15 @@
+{
+  "name": "syrup-waiting-for-naniyori",
+  "version": "1.0.0",
+  "description": "Automated Syrup Friends waiting registration bot for Naniyori ramen",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "local": "node -e \"require('./index.js').handler().then(console.log).catch(console.error)\""
+  },
+  "dependencies": {
+    "aws-lambda-ric": "^4.0.1",
+    "@aws-sdk/client-ssm": "^3.750.0",
+    "playwright": "1.57.0"
+  }
+}
