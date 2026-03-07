@@ -187,7 +187,20 @@ async function registerWaiting(browser, partySize, phoneNumber) {
 
   // Step 1: 인원수 설정 (기본 1명이므로 partySize - 1번 + 버튼 클릭)
   const plusButton = page.locator("button.button-updown").nth(1);
-  await plusButton.waitFor({ state: "visible" });
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await plusButton.waitFor({ state: "visible", timeout: 8000 });
+      break;
+    } catch (err) {
+      if (attempt === MAX_RETRIES) throw err;
+      const html = await page.content();
+      const bodyStart = html.indexOf('<body');
+      console.log(`버튼 미발견 (${attempt}/${MAX_RETRIES}), 페이지 body 일부: ${html.substring(bodyStart, bodyStart + 500)}`);
+      await page.waitForTimeout(5000);
+      await page.reload({ waitUntil: "networkidle" });
+    }
+  }
   for (let i = 0; i < partySize - 1; i++) {
     await plusButton.click();
     await page.waitForTimeout(200);
@@ -311,7 +324,7 @@ exports.handler = async (event, context) => {
     const targetHourUTC = slot === "am" ? 1 : 7;
     const now = new Date();
     const target = new Date(now);
-    target.setUTCHours(targetHourUTC, 0, 0, 0);
+    target.setUTCHours(targetHourUTC, 0, 1, 0); // 정시 + 1초
     const waitMs = target.getTime() - now.getTime();
     if (waitMs > 0 && waitMs < 3 * 60 * 1000) {
       console.log(`Target ${slotLabel} 시각까지 ${waitMs}ms 대기`);
