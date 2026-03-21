@@ -83,6 +83,28 @@ aws-vault exec <profile> -- aws logs get-log-events \
 나니요리 라멘집의 [시럽프렌즈](https://wait.syrupfriends.com) 웨이팅을 자동 등록하는 봇입니다.
 Slack Slash Command(`/waiting`)로 인원수/전화번호를 미리 등록하면, EventBridge 스케줄에 맞춰 자동 실행됩니다.
 
+### 멀티탭 슬라이딩 윈도우 전략
+
+정시에 웨이팅이 활성화되는 시점을 빠르게 감지하기 위해, 단일 페이지 재시도 대신 **멀티탭 슬라이딩 윈도우** 방식을 사용합니다.
+
+- 동시 탭 수: `MAX_CONCURRENT_TABS = 3`
+- 새 탭 간격: `TAB_OPEN_INTERVAL_MS = 1000` (1초마다 새 탭 열기)
+- 버튼 폴링: `BUTTON_POLL_INTERVAL_MS = 300` (각 탭에서 300ms마다 버튼 확인)
+- 전체 타임아웃: `MULTI_TAB_TIMEOUT_MS = 30000`
+
+```
+T+0s: [탭1]
+T+1s: [탭1, 탭2]
+T+2s: [탭1, 탭2, 탭3]       ← max 도달
+T+3s: [탭2, 탭3, 탭4]       ← 탭1 닫고 탭4 열기
+T+4s: [탭3, 탭4, 탭5]       ← 탭2 닫고 탭5 열기
+...버튼 발견 시 해당 탭으로 등록 진행
+```
+
+- `domcontentloaded`로 빠르게 로드 후 locator 폴링 (기존 `networkidle` 대비 빠름)
+- 멀티탭 실패 시 기존 단일탭 재시도 로직(`registerWaitingSingleTab`)으로 폴백
+- `[Timing]` 로그로 버튼 발견/등록 완료 시간 추적
+
 ### 환경변수
 - `SLACK_WEBHOOK_URL` - 결과 알림용 Slack Webhook URL
 - `SYRUP_WAITING_URL` - 웨이팅 링크 (기본값: `https://wait.syrupfriends.com/waiting/link/XlGXn1Qav79OJGqu`)

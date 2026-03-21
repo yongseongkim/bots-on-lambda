@@ -11,6 +11,11 @@ const SYRUP_WAITING_URL =
   process.env.SYRUP_WAITING_URL ||
   "https://wait.syrupfriends.com/waiting/link/XlGXn1Qav79OJGqu";
 
+const MAX_CONCURRENT_TABS = 3;
+const TAB_OPEN_INTERVAL_MS = 1000;
+const BUTTON_POLL_INTERVAL_MS = 300;
+const MULTI_TAB_TIMEOUT_MS = 30000;
+
 const SSM_PREFIX = "/syrup-waiting";
 const ssmClient = new SSMClient({ region: "ap-northeast-2" });
 
@@ -176,31 +181,91 @@ async function handleSlashCommand(text) {
   };
 }
 
-async function registerWaiting(browser, partySize, phoneNumber) {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
-  // Step 1: 웨이팅 링크로 이동 (자동으로 세션 연결)
-  await page.goto(SYRUP_WAITING_URL);
-  await page.waitForLoadState("networkidle");
-  console.log("웨이팅 페이지 도착:", page.url());
-
-  // Step 1: 인원수 설정 (기본 1명이므로 partySize - 1번 + 버튼 클릭)
-  const plusButton = page.locator("button.button-updown").nth(1);
-  const MAX_RETRIES = 3;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+async function waitForButtonOnPage(page, signal) {
+  while (!signal.found) {
     try {
-      await plusButton.waitFor({ state: "visible", timeout: 8000 });
-      break;
-    } catch (err) {
-      if (attempt === MAX_RETRIES) throw err;
-      const html = await page.content();
-      const bodyStart = html.indexOf('<body');
-      console.log(`버튼 미발견 (${attempt}/${MAX_RETRIES}), 페이지 body 일부: ${html.substring(bodyStart, bodyStart + 500)}`);
-      await page.waitForTimeout(5000);
-      await page.reload({ waitUntil: "networkidle" });
+      const visible = await page
+        .locator("button.button-updown")
+        .nth(1)
+        .isVisible();
+      if (visible) {
+        signal.found = true;
+        return page;
+      }
+    } catch {
+      // page가 닫힌 경우 — 다른 탭이 승리했거나 슬라이딩 윈도우에서 제거됨
+      return null;
     }
+    await new Promise((r) => setTimeout(r, BUTTON_POLL_INTERVAL_MS));
   }
+  return null;
+}
+
+async function findButtonTab(browser, signal) {
+  const tabs = []; // { page, context, promise }
+  const t0 = Date.now();
+
+  try {
+    while (!signal.found) {
+      if (Date.now() - t0 > MULTI_TAB_TIMEOUT_MS) {
+        throw new Error("Multi-tab timeout");
+      }
+
+      // 슬라이딩 윈도우: 가장 오래된 탭 제거
+      if (tabs.length >= MAX_CONCURRENT_TABS) {
+        const oldest = tabs.shift();
+        oldest.context.close().catch(() => {});
+      }
+
+      // 새 탭 열기
+      const ctx = await browser.newContext();
+      const pg = await ctx.newPage();
+      const tabIndex = tabs.length + 1;
+      console.log(`[Tab] #${tabIndex} 열기 (${Date.now() - t0}ms)`);
+
+      pg.goto(SYRUP_WAITING_URL, { waitUntil: "domcontentloaded" }).catch(
+        () => {}
+      );
+      const promise = waitForButtonOnPage(pg, signal);
+      tabs.push({ page: pg, context: ctx, promise });
+
+      // 이번 루프에서 기존 탭 중 버튼 발견했는지 확인
+      const raceResult = await Promise.race([
+        ...tabs.map((t) => t.promise),
+        new Promise((r) => setTimeout(r, TAB_OPEN_INTERVAL_MS)),
+      ]);
+
+      if (raceResult && signal.found) {
+        // 승리 탭 찾기
+        const winnerCtx = tabs.find((t) => t.page === raceResult)?.context;
+        // 나머지 탭 정리
+        for (const t of tabs) {
+          if (t.context !== winnerCtx) {
+            t.context.close().catch(() => {});
+          }
+        }
+        console.log(`[Timing] 버튼 발견: ${Date.now() - t0}ms`);
+        return { page: raceResult, context: winnerCtx };
+      }
+    }
+  } catch (err) {
+    // 에러 시 모든 탭 정리
+    for (const t of tabs) {
+      t.context.close().catch(() => {});
+    }
+    throw err;
+  }
+
+  // signal.found가 외부에서 true로 바뀐 경우 (폴백 전환 등)
+  for (const t of tabs) {
+    t.context.close().catch(() => {});
+  }
+  throw new Error("Aborted");
+}
+
+async function completeRegistration(page, context, partySize, phoneNumber) {
+  // 인원수 설정 (기본 1명이므로 partySize - 1번 + 버튼 클릭)
+  const plusButton = page.locator("button.button-updown").nth(1);
   for (let i = 0; i < partySize - 1; i++) {
     await plusButton.click();
     await page.waitForTimeout(200);
@@ -217,7 +282,6 @@ async function registerWaiting(browser, partySize, phoneNumber) {
   // 다음 버튼 클릭
   const nextButton = page.locator(".button-next");
   await nextButton.waitFor({ state: "visible" });
-  // enabled 상태가 될 때까지 대기
   await page.waitForFunction(
     () => {
       const btn = document.querySelector(".button-next");
@@ -229,15 +293,19 @@ async function registerWaiting(browser, partySize, phoneNumber) {
   console.log("Step 1 완료 - 다음 클릭");
 
   // Step 2: 확인 페이지
-  await page.locator(".info-group-step3").waitFor({ state: "visible", timeout: 10000 });
+  await page
+    .locator(".info-group-step3")
+    .waitFor({ state: "visible", timeout: 10000 });
   console.log("Step 2 - 확인 페이지 로드");
   const confirmButton = page.locator(".button-next");
   await confirmButton.click();
   console.log("Step 2 완료 - 확인 클릭");
 
   // Step 3: 완료 페이지 - 결과 읽기
-  // Next.js 해시 클래스명 대응을 위해 [class*="..."] 사용
-  await page.locator('[class*="wait_text-title"]').first().waitFor({ state: "visible", timeout: 10000 });
+  await page
+    .locator('[class*="wait_text-title"]')
+    .first()
+    .waitFor({ state: "visible", timeout: 10000 });
   console.log("Step 3 - 완료 페이지 로드");
 
   const waitNumber = await page
@@ -260,6 +328,56 @@ async function registerWaiting(browser, partySize, phoneNumber) {
     teamsAhead: teamsAhead.trim(),
     registrationTime: registrationTime.trim(),
   };
+}
+
+async function registerWaitingSingleTab(browser, partySize, phoneNumber) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  await page.goto(SYRUP_WAITING_URL);
+  await page.waitForLoadState("networkidle");
+  console.log("웨이팅 페이지 도착 (싱글탭 폴백):", page.url());
+
+  const plusButton = page.locator("button.button-updown").nth(1);
+  const MAX_RETRIES = 3;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await plusButton.waitFor({ state: "visible", timeout: 8000 });
+      break;
+    } catch (err) {
+      if (attempt === MAX_RETRIES) throw err;
+      const html = await page.content();
+      const bodyStart = html.indexOf("<body");
+      console.log(
+        `버튼 미발견 (${attempt}/${MAX_RETRIES}), 페이지 body 일부: ${html.substring(bodyStart, bodyStart + 500)}`
+      );
+      await page.waitForTimeout(5000);
+      await page.reload({ waitUntil: "networkidle" });
+    }
+  }
+
+  return completeRegistration(page, context, partySize, phoneNumber);
+}
+
+async function registerWaiting(browser, partySize, phoneNumber) {
+  const signal = { found: false };
+  const t0 = Date.now();
+  try {
+    const result = await findButtonTab(browser, signal);
+    console.log(`[Timing] 등록 시작: ${Date.now() - t0}ms`);
+    const reg = await completeRegistration(
+      result.page,
+      result.context,
+      partySize,
+      phoneNumber
+    );
+    console.log(`[Timing] 등록 완료: ${Date.now() - t0}ms`);
+    return reg;
+  } catch (err) {
+    console.warn(`멀티탭 실패: ${err.message}, 단일탭 폴백`);
+    signal.found = true;
+    return registerWaitingSingleTab(browser, partySize, phoneNumber);
+  }
 }
 
 exports.handler = async (event, context) => {
@@ -324,7 +442,7 @@ exports.handler = async (event, context) => {
     const targetHourUTC = slot === "am" ? 1 : 7;
     const now = new Date();
     const target = new Date(now);
-    target.setUTCHours(targetHourUTC, 0, 1, 0); // 정시 + 1초
+    target.setUTCHours(targetHourUTC, 0, 0, 0); // 정시
     const waitMs = target.getTime() - now.getTime();
     if (waitMs > 0 && waitMs < 3 * 60 * 1000) {
       console.log(`Target ${slotLabel} 시각까지 ${waitMs}ms 대기`);
