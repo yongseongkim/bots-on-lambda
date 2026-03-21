@@ -1,18 +1,22 @@
 # bots-on-lambda
 
-AWS Lambda 위에서 돌아가는 봇 모음. 현재 주요 봇은 **buyLotto**(로또 자동 구매)입니다.
+AWS Lambda 위에서 돌아가는 봇 모음.
 
 ## 프로젝트 구조
 
 ```
 bots-on-lambda/
-├── buyLotto/          # 로또 자동 구매 봇
+├── buyLotto/                    # 로또 자동 구매 봇
 │   ├── Dockerfile
 │   ├── index.js
 │   ├── package.json
-│   ├── ecr-lifecycle-policy.json
-│   └── serverless.yml
-└── usedSthCrawler/    # (미사용) 중고 크롤러
+│   └── ecr-lifecycle-policy.json
+├── syrupWaitingForNaniyori/     # 나니요리 웨이팅 자동 등록 봇
+│   ├── Dockerfile
+│   ├── index.js
+│   ├── package.json
+│   └── ecr-lifecycle-policy.json
+└── usedSthCrawler/              # (미사용) 중고 크롤러
 ```
 
 ## buyLotto
@@ -73,3 +77,47 @@ npm run local
 ```
 
 환경변수(`LOTTO_ID`, `LOTTO_PW`, `SLACK_WEBHOOK_URL`)를 미리 설정해야 합니다.
+
+## syrupWaitingForNaniyori
+
+나니요리 라멘집의 [시럽프렌즈](https://wait.syrupfriends.com) 웨이팅을 자동 등록하는 봇입니다.
+
+- **Playwright + Chromium**으로 브라우저 자동화
+- **멀티탭 슬라이딩 윈도우** 전략으로 웨이팅 버튼 감지 (동시 3탭, 1초 간격 교체, 300ms 폴링)
+- Slack Slash Command(`/waiting`)로 인원수/전화번호 설정
+- EventBridge 스케줄로 화/수/금/토/일 10:00, 16:00 KST 자동 실행
+- 결과 **Slack 웹훅**으로 알림
+
+### 환경변수
+
+| 변수 | 설명 |
+|---|---|
+| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL |
+| `SYRUP_WAITING_URL` | 웨이팅 링크 (기본값 내장) |
+
+### 빌드 및 배포
+
+```bash
+# 1. Docker 이미지 빌드
+docker build --platform linux/amd64 --provenance=false -t syrup-waiting-for-naniyori syrupWaitingForNaniyori/
+
+# 2. ECR 로그인
+aws-vault exec <profile> -- aws ecr get-login-password --region ap-northeast-2 \
+  | docker login --username AWS --password-stdin 084761792497.dkr.ecr.ap-northeast-2.amazonaws.com
+
+# 3. 태그 및 푸시
+docker tag syrup-waiting-for-naniyori:latest 084761792497.dkr.ecr.ap-northeast-2.amazonaws.com/syrup-waiting-for-naniyori:latest
+docker push 084761792497.dkr.ecr.ap-northeast-2.amazonaws.com/syrup-waiting-for-naniyori:latest
+
+# 4. Lambda 함수 업데이트
+aws-vault exec <profile> -- aws lambda update-function-code \
+  --function-name syrup-waiting-for-naniyori \
+  --image-uri 084761792497.dkr.ecr.ap-northeast-2.amazonaws.com/syrup-waiting-for-naniyori:latest \
+  --region ap-northeast-2
+
+# 5. ECR 수명주기 정책 적용
+aws-vault exec <profile> -- aws ecr put-lifecycle-policy \
+  --repository-name syrup-waiting-for-naniyori \
+  --lifecycle-policy-text file://syrupWaitingForNaniyori/ecr-lifecycle-policy.json \
+  --region ap-northeast-2
+```
